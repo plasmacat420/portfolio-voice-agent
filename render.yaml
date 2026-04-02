@@ -15,10 +15,8 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
-      - key: ELEVENLABS_API_KEY
+      - key: CARTESIA_API_KEY
         sync: false
-      - key: ELEVENLABS_VOICE_ID
-        value: 21m00Tcm4TlvDq8ikWAM
       - key: GMAIL_APP_PASSWORD
         sync: false
       - key: OWNER_EMAIL

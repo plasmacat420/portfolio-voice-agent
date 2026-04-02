@@ -13,9 +13,12 @@ class Settings(BaseSettings):
     # OpenAI (fallback / summarizer)
     OPENAI_API_KEY: str = ""
 
-    # ElevenLabs
+    # Cartesia TTS (free tier)
+    CARTESIA_API_KEY: str = ""
+
+    # ElevenLabs (kept for reference)
     ELEVENLABS_API_KEY: str = ""
-    ELEVENLABS_VOICE_ID: str = "21m00Tcm4TlvDq8ikWAM"  # Rachel — warm, professional female voice
+    ELEVENLABS_VOICE_ID: str = "21m00Tcm4TlvDq8ikWAM"
 
     # Gmail SMTP
     GMAIL_APP_PASSWORD: str = ""

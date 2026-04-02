@@ -3,7 +3,7 @@ import logging
 
 from livekit.agents import Agent, AgentSession, JobContext
 from livekit.agents import llm as agents_llm
-from livekit.plugins import elevenlabs, openai, silero
+from livekit.plugins import cartesia, openai, silero
 
 from agent.config import settings
 from agent.emailer import send_summary_email
@@ -64,10 +64,10 @@ async def entrypoint(ctx: JobContext):
             base_url=GROQ_BASE_URL,
             api_key=settings.GROQ_API_KEY,
         ),
-        tts=elevenlabs.TTS(
-            voice_id=settings.ELEVENLABS_VOICE_ID,
-            api_key=settings.ELEVENLABS_API_KEY,
-            model="eleven_turbo_v2_5",
+        tts=cartesia.TTS(
+            api_key=settings.CARTESIA_API_KEY,
+            model="sonic-2",
+            voice="694f9389-aac1-45b6-b726-9d9369183238",  # "Barbra" — warm professional female
         ),
         vad=silero.VAD.load(),
     )
