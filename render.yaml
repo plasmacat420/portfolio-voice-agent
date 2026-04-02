@@ -1,5 +1,5 @@
 services:
-  # FastAPI backend — token API
+  # Single service — FastAPI + LiveKit agent worker in one process
   - type: web
     name: portfolio-voice-agent-api
     runtime: python
@@ -27,30 +27,3 @@ services:
         value: prepreater1@gmail.com
       - key: FRONTEND_URL
         value: https://plasmacat420.github.io
-
-  # LiveKit agent worker — Zara's brain
-  - type: worker
-    name: portfolio-voice-agent-worker
-    runtime: python
-    buildCommand: pip install -e .
-    startCommand: python agent/main.py start
-    plan: free
-    envVars:
-      - key: LIVEKIT_URL
-        sync: false
-      - key: LIVEKIT_API_KEY
-        sync: false
-      - key: LIVEKIT_API_SECRET
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: ELEVENLABS_API_KEY
-        sync: false
-      - key: ELEVENLABS_VOICE_ID
-        value: 21m00Tcm4TlvDq8ikWAM
-      - key: GMAIL_APP_PASSWORD
-        sync: false
-      - key: OWNER_EMAIL
-        value: prepreater1@gmail.com
-      - key: FROM_EMAIL
-        value: prepreater1@gmail.com

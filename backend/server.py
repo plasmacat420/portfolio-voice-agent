@@ -1,21 +1,59 @@
+import asyncio
 import logging
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from livekit.agents import WorkerOptions
+from livekit.agents.worker import AgentServer
 from livekit.api import AccessToken, VideoGrants
 from pydantic import BaseModel
 
 from agent.config import settings
+from agent.zara import entrypoint
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Portfolio Voice Agent API", version="0.1.0")
+_agent_task: asyncio.Task | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _agent_task
+
+    # Start the LiveKit agent worker in the background alongside FastAPI
+    worker_options = WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        ws_url=settings.LIVEKIT_URL,
+        api_key=settings.LIVEKIT_API_KEY,
+        api_secret=settings.LIVEKIT_API_SECRET,
+    )
+    server = AgentServer.from_server_options(worker_options)
+    _agent_task = asyncio.create_task(server.run())
+    logger.info("LiveKit agent worker started alongside FastAPI")
+
+    yield
+
+    if _agent_task:
+        _agent_task.cancel()
+        try:
+            await _agent_task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="Portfolio Voice Agent API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        settings.FRONTEND_URL,
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://plasmacat420.github.io",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,9 +109,3 @@ async def create_token(request: TokenRequest):
         room=room_name,
         livekit_url=settings.LIVEKIT_URL,
     )
-
-
-@app.on_event("startup")
-async def startup():
-    logger.info("Portfolio Voice Agent API started")
-    logger.info(f"CORS origin: {settings.FRONTEND_URL}")
