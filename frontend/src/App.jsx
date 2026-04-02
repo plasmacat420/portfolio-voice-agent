@@ -5,59 +5,36 @@ import SummaryCard from "./components/SummaryCard.jsx";
 import { useVoiceSession } from "./hooks/useVoiceSession.js";
 
 export default function App() {
-  const [appState, setAppState] = useState("idle"); // idle | in-call | summary
-
-  const {
-    connectionState,
-    transcript,
-    isSpeaking,
-    isListening,
-    callDuration,
-    summary,
-    error,
-    connect,
-    disconnect,
-  } = useVoiceSession();
+  const { connectionInfo, appState, error, connect, disconnect } = useVoiceSession();
 
   const handleStart = useCallback(
     async (visitorName) => {
       await connect(visitorName);
-      setAppState("in-call");
     },
     [connect]
   );
 
-  const handleEnd = useCallback(async () => {
-    await disconnect();
-    setAppState("summary");
+  const handleEnd = useCallback(() => {
+    disconnect();
   }, [disconnect]);
 
   const handleRestart = useCallback(() => {
-    setAppState("idle");
+    window.location.reload();
   }, []);
 
-  if (appState === "idle") {
-    return <HeroSection onStart={handleStart} />;
+  if (appState === "idle" || appState === "connecting" || appState === "error") {
+    return <HeroSection onStart={handleStart} error={error} />;
   }
 
-  if (appState === "in-call") {
+  if (appState === "in-call" && connectionInfo) {
     return (
       <VoiceInterface
-        connectionState={connectionState}
-        transcript={transcript}
-        isSpeaking={isSpeaking}
-        isListening={isListening}
-        callDuration={callDuration}
+        token={connectionInfo.token}
+        serverUrl={connectionInfo.livekit_url}
         onEnd={handleEnd}
       />
     );
   }
 
-  return (
-    <SummaryCard
-      summary={summary}
-      transcript={transcript}
-      onRestart={handleRestart}
-    />
-  );
+  return <SummaryCard onRestart={handleRestart} />;
 }

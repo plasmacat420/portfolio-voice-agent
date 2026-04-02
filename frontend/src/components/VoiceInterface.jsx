@@ -1,5 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  useVoiceAssistant,
+  useChat,
+  useConnectionState,
+} from "@livekit/components-react";
+import { ConnectionState } from "livekit-client";
 import StatusBadge from "./StatusBadge.jsx";
 
 function formatDuration(seconds) {
@@ -8,31 +16,66 @@ function formatDuration(seconds) {
   return `${m}:${s}`;
 }
 
-export default function VoiceInterface({
-  connectionState,
-  transcript,
-  isSpeaking,
-  isListening,
-  callDuration,
-  onEnd,
-}) {
-  const transcriptRef = useRef(null);
-  const [showEndConfirm, setShowEndConfirm] = useState(false);
+/** Inner component — runs inside <LiveKitRoom> so hooks work */
+function CallUI({ onEnd }) {
+  const { state: agentState } = useVoiceAssistant();
+  const connectionState = useConnectionState();
+  const { chatMessages } = useChat();
 
+  const [callDuration, setCallDuration] = useState(0);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const transcriptRef = useRef(null);
+  const timerRef = useRef(null);
+
+  // Map LiveKit ConnectionState to our StatusBadge states
+  const badgeState =
+    connectionState === ConnectionState.Connected
+      ? "connected"
+      : connectionState === ConnectionState.Connecting ||
+        connectionState === ConnectionState.Reconnecting
+      ? "connecting"
+      : connectionState === ConnectionState.Disconnected
+      ? "disconnected"
+      : "idle";
+
+  // Start timer once connected
+  useEffect(() => {
+    if (connectionState === ConnectionState.Connected) {
+      const start = Date.now();
+      timerRef.current = setInterval(
+        () => setCallDuration(Math.floor((Date.now() - start) / 1000)),
+        1000
+      );
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [connectionState]);
+
+  // Auto-scroll transcript
   useEffect(() => {
     if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
     }
-  }, [transcript]);
+  }, [chatMessages]);
 
-  const statusText = isSpeaking
-    ? "Zara is speaking..."
-    : isListening
-    ? "Listening..."
-    : "Processing...";
+  const isSpeaking = agentState === "speaking";
+  const isListening = agentState === "listening";
+
+  const statusText =
+    agentState === "speaking"
+      ? "Zara is speaking..."
+      : agentState === "thinking"
+      ? "Processing..."
+      : agentState === "listening"
+      ? "Listening..."
+      : "Connecting...";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-start pt-8 px-4 pb-8">
+      {/* LiveKit renders agent audio here — REQUIRED for voice to play */}
+      <RoomAudioRenderer />
+
       <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -41,7 +84,7 @@ export default function VoiceInterface({
             <p className="text-slate-400 text-sm">Faiz Shaikh&apos;s AI Assistant</p>
           </div>
           <div className="flex items-center gap-4">
-            <StatusBadge state={connectionState} />
+            <StatusBadge state={badgeState} />
             <span className="text-slate-400 text-sm font-mono">
               {formatDuration(callDuration)}
             </span>
@@ -51,11 +94,10 @@ export default function VoiceInterface({
         {/* Zara Avatar */}
         <div className="flex justify-center mb-8">
           <div className="relative">
-            {/* Outer rings */}
             {isSpeaking && (
               <>
                 <div className="absolute inset-0 rounded-full border-2 border-violet-500/30 animate-ping scale-150" />
-                <div className="absolute inset-0 rounded-full border-2 border-blue-500/20 animate-ping scale-125 animation-delay-150" />
+                <div className="absolute inset-0 rounded-full border-2 border-blue-500/20 animate-ping scale-125" />
               </>
             )}
             <div
@@ -74,17 +116,17 @@ export default function VoiceInterface({
           </div>
         </div>
 
-        {/* Status indicator */}
+        {/* Status */}
         <div className="text-center mb-6">
           <span className="text-slate-400 text-sm">{statusText}</span>
         </div>
 
-        {/* Transcript */}
+        {/* Transcript — LiveKit chat messages from the agent */}
         <div
           ref={transcriptRef}
           className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 h-72 overflow-y-auto scrollbar-hide mb-6 space-y-3"
         >
-          {transcript.length === 0 ? (
+          {chatMessages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <p className="text-slate-600 text-sm text-center">
                 Conversation will appear here...
@@ -93,22 +135,25 @@ export default function VoiceInterface({
               </p>
             </div>
           ) : (
-            transcript.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
+            chatMessages.map((msg) => {
+              const isUser = msg.from?.isLocal;
+              return (
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-violet-600/80 text-white rounded-tr-sm"
-                      : "bg-slate-700/80 text-slate-100 rounded-tl-sm"
-                  }`}
+                  key={msg.id}
+                  className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                 >
-                  {msg.content}
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                      isUser
+                        ? "bg-violet-600/80 text-white rounded-tr-sm"
+                        : "bg-slate-700/80 text-slate-100 rounded-tl-sm"
+                    }`}
+                  >
+                    {msg.message}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -142,5 +187,21 @@ export default function VoiceInterface({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Outer component — provides the LiveKit room context */
+export default function VoiceInterface({ token, serverUrl, onEnd }) {
+  return (
+    <LiveKitRoom
+      token={token}
+      serverUrl={serverUrl}
+      connect={true}
+      audio={true}
+      video={false}
+      onDisconnected={onEnd}
+    >
+      <CallUI onEnd={onEnd} />
+    </LiveKitRoom>
   );
 }
