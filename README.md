@@ -25,7 +25,7 @@ When the conversation ends, the visitor receives an on-screen summary card and F
 
 **[https://plasmacat420.github.io/portfolio-voice-agent](https://plasmacat420.github.io/portfolio-voice-agent)**
 
-> Note: The live demo requires a running backend with valid API keys (LiveKit Cloud, OpenAI, ElevenLabs, SendGrid). See [Setup & Deployment](#setup--deployment) to run it yourself.
+> Note: The live demo requires a running backend with valid API keys (LiveKit Cloud, OpenAI, ElevenLabs, Gmail). See [Setup & Deployment](#setup--deployment) to run it yourself.
 
 ---
 
@@ -34,7 +34,7 @@ When the conversation ends, the visitor receives an on-screen summary card and F
 1. **Visitor clicks "Talk to Zara"** — enters their name, browser requests a LiveKit token from the FastAPI backend, and joins a private room.
 2. **Real-time voice pipeline** — Whisper transcribes speech -> GPT-4o generates a response -> ElevenLabs synthesises natural audio -> streamed back in under a second.
 3. **Guardrails keep it professional** — any off-topic, inappropriate, or jailbreak attempt is caught before it reaches the LLM and redirected politely.
-4. **Call ends -> automatic summary** — GPT-4o analyses the full transcript, extracts key topics and visitor intent, and sends the full report to Faiz's inbox via SendGrid.
+4. **Call ends -> automatic summary** — GPT-4o analyses the full transcript, extracts key topics and visitor intent, and sends the full report to Faiz's inbox via Gmail SMTP.
 
 ---
 
@@ -56,7 +56,7 @@ FastAPI Backend                          Zara Agent (Python)
                                          +-- Guardrails
                                          +-- On session end:
                                               +-- GPT-4o Summarizer
-                                              +-- SendGrid -> Faiz's inbox
+                                              +-- Gmail SMTP -> Faiz's inbox
 ```
 
 ---
@@ -80,7 +80,7 @@ FastAPI Backend                          Zara Agent (Python)
 | Voice pipeline | LiveKit Agents SDK, OpenAI Whisper, GPT-4o, ElevenLabs |
 | Backend API | Python 3.11, FastAPI, livekit-api |
 | Frontend | React 18, Vite, TailwindCSS, LiveKit React SDK |
-| Email | SendGrid |
+| Email | Gmail SMTP (App Password) |
 | Infra | Docker, docker-compose, GitHub Actions, GHCR, GitHub Pages |
 
 ---
@@ -93,7 +93,7 @@ You'll need accounts and API keys for:
 - [LiveKit Cloud](https://livekit.io) — free tier available
 - [OpenAI](https://platform.openai.com) — Whisper + GPT-4o
 - [ElevenLabs](https://elevenlabs.io) — free tier available
-- [SendGrid](https://sendgrid.com) — free tier (100 emails/day)
+- Gmail account with an App Password — free, no third-party service needed
 
 ### Local development
 
@@ -173,7 +173,7 @@ portfolio-voice-agent/
 |   +-- knowledge.py    # Faiz's full knowledge base
 |   +-- guardrails.py   # Off-topic detection
 |   +-- summarizer.py   # GPT-4o conversation analysis
-|   +-- emailer.py      # SendGrid email sender
+|   +-- emailer.py      # Gmail SMTP email sender
 |   +-- config.py       # Pydantic settings
 +-- backend/            # FastAPI -- token API
 |   +-- server.py
