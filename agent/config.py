@@ -7,7 +7,10 @@ class Settings(BaseSettings):
     LIVEKIT_API_KEY: str = ""
     LIVEKIT_API_SECRET: str = ""
 
-    # OpenAI
+    # Groq (free) — used for LLM + STT
+    GROQ_API_KEY: str = ""
+
+    # OpenAI (fallback / summarizer)
     OPENAI_API_KEY: str = ""
 
     # ElevenLabs

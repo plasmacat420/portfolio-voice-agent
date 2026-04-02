@@ -4,6 +4,8 @@ from openai import AsyncOpenAI
 
 from agent.config import settings
 
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
 
 async def summarize_conversation(transcript: list[dict]) -> dict:
     """
@@ -15,14 +17,17 @@ async def summarize_conversation(transcript: list[dict]) -> dict:
         recommended_action: str # e.g. "Follow up — showed strong interest in AI agent work"
     }
     """
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = AsyncOpenAI(
+        api_key=settings.GROQ_API_KEY,
+        base_url=GROQ_BASE_URL,
+    )
 
     transcript_text = "\n".join(
         [f"{m['role'].upper()}: {m['content']}" for m in transcript]
     )
 
     response = await client.chat.completions.create(
-        model="gpt-4o",
+        model="llama-3.3-70b-versatile",
         messages=[
             {
                 "role": "system",

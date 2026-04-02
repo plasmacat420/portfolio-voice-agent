@@ -50,9 +50,19 @@ async def entrypoint(ctx: JobContext):
 
     transcript: list[dict] = []
 
+    GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
     session = AgentSession(
-        stt=openai.STT(model="whisper-1"),
-        llm=openai.LLM(model="gpt-4o"),
+        stt=openai.STT(
+            model="whisper-large-v3-turbo",
+            base_url=GROQ_BASE_URL,
+            api_key=settings.GROQ_API_KEY,
+        ),
+        llm=openai.LLM(
+            model="llama-3.3-70b-versatile",
+            base_url=GROQ_BASE_URL,
+            api_key=settings.GROQ_API_KEY,
+        ),
         tts=elevenlabs.TTS(
             voice_id=settings.ELEVENLABS_VOICE_ID,
             api_key=settings.ELEVENLABS_API_KEY,
