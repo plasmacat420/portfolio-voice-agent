@@ -13,6 +13,8 @@ from agent.summarizer import summarize_conversation
 
 logger = logging.getLogger(__name__)
 
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
 
 class Zara(Agent):
     def __init__(self):
@@ -30,7 +32,7 @@ class Zara(Agent):
     ) -> None:
         text = new_message.text_content or ""
         if is_off_topic(text):
-            turn_ctx.items.clear()
+            # Don't call super() — prevents LLM from generating a response
             await self.session.say(get_redirect_response(), allow_interruptions=True)
             return
         await super().on_user_turn_completed(turn_ctx, new_message)
@@ -50,14 +52,13 @@ async def entrypoint(ctx: JobContext):
 
     transcript: list[dict] = []
 
-    GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-
     session = AgentSession(
-        stt=openai.STT(
+        # Use built-in Groq factory for STT (Whisper via Groq — free)
+        stt=openai.STT.with_groq(
             model="whisper-large-v3-turbo",
-            base_url=GROQ_BASE_URL,
             api_key=settings.GROQ_API_KEY,
         ),
+        # Groq LLM via OpenAI-compatible base_url (free)
         llm=openai.LLM(
             model="llama-3.3-70b-versatile",
             base_url=GROQ_BASE_URL,
@@ -66,7 +67,7 @@ async def entrypoint(ctx: JobContext):
         tts=elevenlabs.TTS(
             voice_id=settings.ELEVENLABS_VOICE_ID,
             api_key=settings.ELEVENLABS_API_KEY,
-            model="eleven_turbo_v2",
+            model="eleven_turbo_v2_5",
         ),
         vad=silero.VAD.load(),
     )
@@ -86,6 +87,8 @@ async def entrypoint(ctx: JobContext):
     @session.on("close")
     def on_close(ev) -> None:
         if len(transcript) > 2:
-            asyncio.ensure_future(_post_call(transcript.copy()))
+            # Safe way to schedule async work from a sync handler in Python 3.10+
+            asyncio.get_running_loop().create_task(_post_call(transcript.copy()))
 
-    await session.start(ctx.room, agent=Zara())
+    # agent is first positional arg; room is keyword-only
+    await session.start(Zara(), room=ctx.room)
