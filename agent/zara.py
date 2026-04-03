@@ -3,7 +3,8 @@ import logging
 
 from livekit.agents import Agent, AgentSession, JobContext
 from livekit.agents import llm as agents_llm
-from livekit.plugins import cartesia, openai
+from livekit.agents import stt as agents_stt
+from livekit.plugins import cartesia, openai, silero
 
 from agent.config import settings
 from agent.emailer import send_summary_email
@@ -54,10 +55,14 @@ async def entrypoint(ctx: JobContext):
     transcript: list[dict] = []
 
     session = AgentSession(
-        # Use built-in Groq factory for STT (Whisper via Groq — free)
-        stt=openai.STT.with_groq(
-            model="whisper-large-v3-turbo",
-            api_key=settings.GROQ_API_KEY,
+        # Groq Whisper is batch (non-streaming), so wrap with StreamAdapter + Silero VAD
+        # Silero detects end-of-speech → sends buffered audio to Whisper in one shot
+        stt=agents_stt.StreamAdapter(
+            stt=openai.STT.with_groq(
+                model="whisper-large-v3-turbo",
+                api_key=settings.GROQ_API_KEY,
+            ),
+            vad=silero.VAD.load(),
         ),
         # Groq LLM via OpenAI-compatible base_url (free)
         llm=openai.LLM(
@@ -70,7 +75,6 @@ async def entrypoint(ctx: JobContext):
             model="sonic-2",
             voice="794f9389-aac1-45b6-b726-9d9369183238",  # "Barbra" — warm professional female
         ),
-        turn_detection="stt",  # STT-based turn detection — no Silero VAD, much lighter on CPU
     )
 
     @session.on("user_input_transcribed")
