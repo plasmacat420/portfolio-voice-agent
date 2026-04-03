@@ -67,7 +67,7 @@ async def entrypoint(ctx: JobContext):
         tts=cartesia.TTS(
             api_key=settings.CARTESIA_API_KEY,
             model="sonic-2",
-            voice="694f9389-aac1-45b6-b726-9d9369183238",  # "Barbra" — warm professional female
+            voice="794f9389-aac1-45b6-b726-9d9369183238",  # "Barbra" — warm professional female
         ),
         vad=silero.VAD.load(),
     )
