@@ -3,8 +3,7 @@ import logging
 
 from livekit.agents import Agent, AgentSession, JobContext
 from livekit.agents import llm as agents_llm
-from livekit.agents import stt as agents_stt
-from livekit.plugins import cartesia, openai, silero
+from livekit.plugins import cartesia, deepgram, openai
 
 from agent.config import settings
 from agent.emailer import send_summary_email
@@ -55,17 +54,11 @@ async def entrypoint(ctx: JobContext):
     transcript: list[dict] = []
 
     session = AgentSession(
-        # Groq Whisper is batch (non-streaming), so wrap with StreamAdapter + Silero VAD
-        # Silero detects end-of-speech → sends buffered audio to Whisper in one shot
-        stt=agents_stt.StreamAdapter(
-            stt=openai.STT.with_groq(
-                model="whisper-large-v3-turbo",
-                api_key=settings.GROQ_API_KEY,
-            ),
-            vad=silero.VAD.load(
-                sample_rate=8000,          # half the audio data → half the CPU
-                min_silence_duration=0.6,  # slightly longer pause before turn ends
-            ),
+        # Deepgram Nova-2 — streaming STT via WebSocket, no local VAD needed
+        stt=deepgram.STT(
+            api_key=settings.DEEPGRAM_API_KEY,
+            model="nova-2",
+            language="en",
         ),
         # Groq LLM via OpenAI-compatible base_url (free)
         llm=openai.LLM(

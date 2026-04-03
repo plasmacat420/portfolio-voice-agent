@@ -7,8 +7,11 @@ class Settings(BaseSettings):
     LIVEKIT_API_KEY: str = ""
     LIVEKIT_API_SECRET: str = ""
 
-    # Groq (free) — used for LLM + STT
+    # Groq (free) — LLM
     GROQ_API_KEY: str = ""
+
+    # Deepgram (free 200 hrs/month) — streaming STT
+    DEEPGRAM_API_KEY: str = ""
 
     # OpenAI (fallback / summarizer)
     OPENAI_API_KEY: str = ""
