@@ -3,7 +3,7 @@ import logging
 
 from livekit.agents import Agent, AgentSession, JobContext
 from livekit.agents import llm as agents_llm
-from livekit.plugins import cartesia, openai, silero
+from livekit.plugins import cartesia, openai
 
 from agent.config import settings
 from agent.emailer import send_summary_email
@@ -22,8 +22,9 @@ class Zara(Agent):
 
     async def on_enter(self) -> None:
         await self.session.say(
-            "Hi! I'm Zara, Faiz's AI assistant. I'm here to tell you about his "
-            "background, skills, and projects. What would you like to know?",
+            "Hey! I'm Zara — built by Faiz Shaikh. I'm here to talk about AI: "
+            "how it actually works, what you can build with it, and where it's heading. "
+            "What are you curious about?",
             allow_interruptions=True,
         )
 
@@ -69,7 +70,7 @@ async def entrypoint(ctx: JobContext):
             model="sonic-2",
             voice="794f9389-aac1-45b6-b726-9d9369183238",  # "Barbra" — warm professional female
         ),
-        vad=silero.VAD.load(),
+        turn_detection="stt",  # STT-based turn detection — no Silero VAD, much lighter on CPU
     )
 
     @session.on("user_input_transcribed")

@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Mic, MicOff, PhoneOff, Volume2, Loader2 } from "lucide-react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
   useVoiceAssistant,
   useChat,
   useConnectionState,
+  useRemoteParticipants,
 } from "@livekit/components-react";
 import { ConnectionState } from "livekit-client";
 import StatusBadge from "./StatusBadge.jsx";
@@ -16,31 +17,90 @@ function formatDuration(seconds) {
   return `${m}:${s}`;
 }
 
+/** Shown while room is connected but agent hasn't joined yet (Render cold start) */
+function WarmingUp({ waitSeconds }) {
+  const tips = [
+    "Zara runs on Groq + Cartesia — sub-second responses once she's live.",
+    "Ask about LLM agents, RAG, MCP servers, or AI in production.",
+    "This assistant is fully open source — check github.com/plasmacat420.",
+    "Powered by Llama 3.3 70B via Groq and Cartesia voice synthesis.",
+  ];
+  const tip = tips[Math.floor(waitSeconds / 8) % tips.length];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
+      <div className="text-center max-w-md">
+        {/* Spinner */}
+        <div className="flex justify-center mb-6">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-violet-600/30 to-blue-600/30 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+            </div>
+          </div>
+        </div>
+
+        <h2 className="text-xl font-semibold text-white mb-2">Zara is warming up...</h2>
+        <p className="text-slate-400 text-sm mb-6">
+          The server is starting up — this takes about 30–60 seconds on first load.
+          Hang tight.
+        </p>
+
+        {/* Progress dots */}
+        <div className="flex justify-center gap-1.5 mb-8">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
+                (waitSeconds % 5) >= i ? "bg-violet-400" : "bg-slate-700"
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Rotating tip */}
+        <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3">
+          <p className="text-slate-400 text-xs leading-relaxed">{tip}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Inner component — runs inside <LiveKitRoom> so hooks work */
 function CallUI({ onEnd }) {
   const { state: agentState } = useVoiceAssistant();
   const connectionState = useConnectionState();
+  const remoteParticipants = useRemoteParticipants();
   const { chatMessages } = useChat();
 
   const [callDuration, setCallDuration] = useState(0);
+  const [waitSeconds, setWaitSeconds] = useState(0);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const transcriptRef = useRef(null);
   const timerRef = useRef(null);
+  const waitTimerRef = useRef(null);
 
-  // Map LiveKit ConnectionState to our StatusBadge states
-  const badgeState =
-    connectionState === ConnectionState.Connected
-      ? "connected"
-      : connectionState === ConnectionState.Connecting ||
-        connectionState === ConnectionState.Reconnecting
-      ? "connecting"
-      : connectionState === ConnectionState.Disconnected
-      ? "disconnected"
-      : "idle";
+  const isConnected = connectionState === ConnectionState.Connected;
+  const agentJoined = remoteParticipants.length > 0;
 
-  // Start timer once connected
+  // Count up while waiting for agent
   useEffect(() => {
-    if (connectionState === ConnectionState.Connected) {
+    if (isConnected && !agentJoined) {
+      waitTimerRef.current = setInterval(
+        () => setWaitSeconds((s) => s + 1),
+        1000
+      );
+    } else {
+      if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+    }
+    return () => {
+      if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+    };
+  }, [isConnected, agentJoined]);
+
+  // Call duration timer — starts once agent has joined
+  useEffect(() => {
+    if (agentJoined) {
       const start = Date.now();
       timerRef.current = setInterval(
         () => setCallDuration(Math.floor((Date.now() - start) / 1000)),
@@ -50,7 +110,7 @@ function CallUI({ onEnd }) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [connectionState]);
+  }, [agentJoined]);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -59,21 +119,29 @@ function CallUI({ onEnd }) {
     }
   }, [chatMessages]);
 
+  // Show warm-up screen while room connected but agent not yet joined
+  if (isConnected && !agentJoined) {
+    return <WarmingUp waitSeconds={waitSeconds} />;
+  }
+
+  const badgeState =
+    connectionState === ConnectionState.Connected ? "connected"
+    : connectionState === ConnectionState.Connecting ||
+      connectionState === ConnectionState.Reconnecting ? "connecting"
+    : connectionState === ConnectionState.Disconnected ? "disconnected"
+    : "idle";
+
   const isSpeaking = agentState === "speaking";
   const isListening = agentState === "listening";
 
   const statusText =
-    agentState === "speaking"
-      ? "Zara is speaking..."
-      : agentState === "thinking"
-      ? "Processing..."
-      : agentState === "listening"
-      ? "Listening..."
-      : "Connecting...";
+    agentState === "speaking" ? "Zara is speaking..."
+    : agentState === "thinking" ? "Processing..."
+    : agentState === "listening" ? "Listening..."
+    : "Ready";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-start pt-8 px-4 pb-8">
-      {/* LiveKit renders agent audio here — REQUIRED for voice to play */}
       <RoomAudioRenderer />
 
       <div className="w-full max-w-2xl">
@@ -81,7 +149,7 @@ function CallUI({ onEnd }) {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-white">Zara</h1>
-            <p className="text-slate-400 text-sm">Faiz Shaikh&apos;s AI Assistant</p>
+            <p className="text-slate-400 text-sm">AI by Faiz Shaikh</p>
           </div>
           <div className="flex items-center gap-4">
             <StatusBadge state={badgeState} />
@@ -91,7 +159,7 @@ function CallUI({ onEnd }) {
           </div>
         </div>
 
-        {/* Zara Avatar */}
+        {/* Avatar */}
         <div className="flex justify-center mb-8">
           <div className="relative">
             {isSpeaking && (
@@ -116,12 +184,11 @@ function CallUI({ onEnd }) {
           </div>
         </div>
 
-        {/* Status */}
         <div className="text-center mb-6">
           <span className="text-slate-400 text-sm">{statusText}</span>
         </div>
 
-        {/* Transcript — LiveKit chat messages from the agent */}
+        {/* Transcript */}
         <div
           ref={transcriptRef}
           className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 h-72 overflow-y-auto scrollbar-hide mb-6 space-y-3"
@@ -190,7 +257,6 @@ function CallUI({ onEnd }) {
   );
 }
 
-/** Outer component — provides the LiveKit room context */
 export default function VoiceInterface({ token, serverUrl, onEnd }) {
   return (
     <LiveKitRoom
