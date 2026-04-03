@@ -62,7 +62,10 @@ async def entrypoint(ctx: JobContext):
                 model="whisper-large-v3-turbo",
                 api_key=settings.GROQ_API_KEY,
             ),
-            vad=silero.VAD.load(),
+            vad=silero.VAD.load(
+                sample_rate=8000,          # half the audio data → half the CPU
+                min_silence_duration=0.6,  # slightly longer pause before turn ends
+            ),
         ),
         # Groq LLM via OpenAI-compatible base_url (free)
         llm=openai.LLM(

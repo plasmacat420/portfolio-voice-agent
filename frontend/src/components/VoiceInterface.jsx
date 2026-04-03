@@ -4,9 +4,10 @@ import {
   LiveKitRoom,
   RoomAudioRenderer,
   useVoiceAssistant,
-  useChat,
+  useTranscriptions,
   useConnectionState,
   useRemoteParticipants,
+  useLocalParticipant,
 } from "@livekit/components-react";
 import { ConnectionState } from "livekit-client";
 import StatusBadge from "./StatusBadge.jsx";
@@ -71,7 +72,8 @@ function CallUI({ onEnd }) {
   const { state: agentState } = useVoiceAssistant();
   const connectionState = useConnectionState();
   const remoteParticipants = useRemoteParticipants();
-  const { chatMessages } = useChat();
+  const { localParticipant } = useLocalParticipant();
+  const transcriptions = useTranscriptions();
 
   const [callDuration, setCallDuration] = useState(0);
   const [waitSeconds, setWaitSeconds] = useState(0);
@@ -117,7 +119,7 @@ function CallUI({ onEnd }) {
     if (transcriptRef.current) {
       transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
     }
-  }, [chatMessages]);
+  }, [transcriptions]);
 
   // Show warm-up screen while room connected but agent not yet joined
   if (isConnected && !agentJoined) {
@@ -193,7 +195,7 @@ function CallUI({ onEnd }) {
           ref={transcriptRef}
           className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 h-72 overflow-y-auto scrollbar-hide mb-6 space-y-3"
         >
-          {chatMessages.length === 0 ? (
+          {transcriptions.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <p className="text-slate-600 text-sm text-center">
                 Conversation will appear here...
@@ -202,11 +204,12 @@ function CallUI({ onEnd }) {
               </p>
             </div>
           ) : (
-            chatMessages.map((msg) => {
-              const isUser = msg.from?.isLocal;
+            transcriptions.map((seg) => {
+              const isUser =
+                seg.participantInfo.identity === localParticipant?.identity;
               return (
                 <div
-                  key={msg.id}
+                  key={seg.streamInfo.id}
                   className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                 >
                   <div
@@ -216,7 +219,7 @@ function CallUI({ onEnd }) {
                         : "bg-slate-700/80 text-slate-100 rounded-tl-sm"
                     }`}
                   >
-                    {msg.message}
+                    {seg.text}
                   </div>
                 </div>
               );
