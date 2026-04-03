@@ -54,11 +54,12 @@ async def entrypoint(ctx: JobContext):
     transcript: list[dict] = []
 
     session = AgentSession(
-        # Deepgram Nova-2 — streaming STT via WebSocket, no local VAD needed
+        # Deepgram Nova-3 — streaming STT via WebSocket, no local VAD needed
+        # endpointing_ms=25 and no_delay=True are defaults (already fast)
         stt=deepgram.STT(
             api_key=settings.DEEPGRAM_API_KEY,
-            model="nova-2",
-            language="en",
+            model="nova-3",
+            language="en-US",
         ),
         # Groq LLM via OpenAI-compatible base_url (free)
         llm=openai.LLM(
@@ -68,7 +69,7 @@ async def entrypoint(ctx: JobContext):
         ),
         tts=cartesia.TTS(
             api_key=settings.CARTESIA_API_KEY,
-            model="sonic-2",
+            model="sonic-turbo",  # lowest latency model (~50ms vs ~300ms for sonic-2)
             voice="794f9389-aac1-45b6-b726-9d9369183238",  # "Barbra" — warm professional female
         ),
     )
