@@ -27,28 +27,7 @@ export default function HeroSection({ onStart, error }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#08080f] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-
-      {/* Dot grid */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: "radial-gradient(circle, rgba(139,92,246,0.15) 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
-        }}
-      />
-
-      {/* Ambient blobs */}
-      <motion.div
-        animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.5, 0.3] }}
-        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-700/20 rounded-full blur-[120px] pointer-events-none"
-      />
-      <motion.div
-        animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
-        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-        className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-700/20 rounded-full blur-[120px] pointer-events-none"
-      />
+    <div className="relative min-h-screen flex flex-col items-center justify-center px-4 overflow-hidden z-10">
 
       {/* Main content */}
       <div className="relative z-10 text-center max-w-2xl mx-auto w-full">

@@ -3,11 +3,7 @@ import { Github, Linkedin, Mail, RotateCcw } from "lucide-react";
 
 export default function SummaryCard({ onRestart }) {
   return (
-    <div className="min-h-screen bg-[#08080f] flex items-center justify-center px-4 py-12">
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{ backgroundImage: "radial-gradient(circle, rgba(139,92,246,0.08) 1px, transparent 1px)", backgroundSize: "32px 32px" }}
-      />
+    <div className="relative min-h-screen flex items-center justify-center px-4 py-12 z-10">
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}

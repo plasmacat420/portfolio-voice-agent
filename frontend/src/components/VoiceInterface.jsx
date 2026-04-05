@@ -30,7 +30,7 @@ function WarmingUp() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#08080f] flex flex-col items-center justify-center px-4">
+    <div className="relative min-h-screen flex flex-col items-center justify-center px-4 z-10">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-center">
         <div className="relative inline-flex mb-8">
           <motion.div
@@ -122,19 +122,8 @@ function CallUI({ onEnd }) {
     : "shadow-[0_0_20px_rgba(139,92,246,0.2)]";
 
   return (
-    <div className="min-h-screen bg-[#08080f] flex flex-col items-center justify-between py-8 px-4">
+    <div className="relative min-h-screen flex flex-col items-center justify-between py-8 px-4 z-10">
       <RoomAudioRenderer />
-
-      {/* Dot grid bg */}
-      <div className="fixed inset-0 pointer-events-none"
-        style={{ backgroundImage: "radial-gradient(circle, rgba(139,92,246,0.08) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-
-      {/* Ambient blob */}
-      <motion.div
-        animate={{ opacity: isSpeaking ? 0.5 : 0.15 }}
-        transition={{ duration: 0.8 }}
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-violet-700/30 rounded-full blur-[120px] pointer-events-none"
-      />
 
       {/* Header */}
       <motion.div

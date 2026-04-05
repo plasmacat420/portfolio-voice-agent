@@ -10,7 +10,7 @@ body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background: #08080f;
+  background: #05050e;
 }
 
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
