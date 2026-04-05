@@ -18,9 +18,7 @@ class Zara(Agent):
 
     async def on_enter(self) -> None:
         await self.session.say(
-            "Hey! I'm Zara — built by Faiz Shaikh. I'm here to talk about AI: "
-            "how it actually works, what you can build with it, and where it's heading. "
-            "What are you curious about?",
+            "Hey! I'm Zara, Faiz's assistant. What brings you here today?",
             allow_interruptions=True,
         )
 
