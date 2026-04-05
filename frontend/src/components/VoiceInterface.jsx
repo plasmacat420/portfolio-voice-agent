@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, Volume2, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mic, PhoneOff, Loader2 } from "lucide-react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -10,218 +11,220 @@ import {
   useLocalParticipant,
 } from "@livekit/components-react";
 import { ConnectionState } from "livekit-client";
-import StatusBadge from "./StatusBadge.jsx";
 
-function formatDuration(seconds) {
-  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-  const s = (seconds % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
+function formatDuration(s) {
+  return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 }
 
-/** Shown while room is connected but agent hasn't joined yet (Render cold start) */
-function WarmingUp({ waitSeconds }) {
+function WarmingUp() {
   const tips = [
-    "Zara runs on Groq + Cartesia — sub-second responses once she's live.",
-    "Ask about LLM agents, RAG, MCP servers, or AI in production.",
-    "This assistant is fully open source — check github.com/plasmacat420.",
-    "Powered by Llama 3.3 70B via Groq and Cartesia voice synthesis.",
+    "Powered by Groq + Cartesia · sub-second responses",
+    "Ask about LLM agents, RAG, MCP, or AI in production",
+    "Fully open source · github.com/plasmacat420",
+    "Running on LiveKit Cloud · ap-south region",
   ];
-  const tip = tips[Math.floor(waitSeconds / 8) % tips.length];
+  const [tip, setTip] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTip((p) => (p + 1) % tips.length), 4000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
-      <div className="text-center max-w-md">
-        {/* Spinner */}
-        <div className="flex justify-center mb-6">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-violet-600/30 to-blue-600/30 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
-            </div>
+    <div className="min-h-screen bg-[#08080f] flex flex-col items-center justify-center px-4">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+        <div className="relative inline-flex mb-8">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 rounded-full border-2 border-transparent border-t-violet-500 border-r-violet-500/30"
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
           </div>
         </div>
-
-        <h2 className="text-xl font-semibold text-white mb-2">Zara is warming up...</h2>
-        <p className="text-slate-400 text-sm mb-6">
-          The server is starting up — this takes about 30–60 seconds on first load.
-          Hang tight.
-        </p>
-
-        {/* Progress dots */}
-        <div className="flex justify-center gap-1.5 mb-8">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
-                (waitSeconds % 5) >= i ? "bg-violet-400" : "bg-slate-700"
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Rotating tip */}
-        <div className="bg-slate-800/60 border border-slate-700 rounded-xl px-4 py-3">
-          <p className="text-slate-400 text-xs leading-relaxed">{tip}</p>
-        </div>
-      </div>
+        <p className="text-white font-semibold mb-1">Zara is joining…</p>
+        <p className="text-slate-500 text-sm mb-8">Should be a few seconds</p>
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={tip}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.35 }}
+            className="text-xs text-slate-600 bg-white/[0.03] border border-white/[0.06] px-4 py-2.5 rounded-xl max-w-xs"
+          >
+            {tips[tip]}
+          </motion.p>
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 }
 
-/** Inner component — runs inside <LiveKitRoom> so hooks work */
+function WaveBars({ active }) {
+  return (
+    <div className="flex items-center gap-[3px] h-10">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div
+          key={i}
+          className={`w-[3px] rounded-full bg-gradient-to-t from-violet-700 to-violet-300 ${active ? "wave-bar" : ""}`}
+          style={{ height: "100%", transform: active ? undefined : "scaleY(0.15)", transformOrigin: "bottom", opacity: active ? 1 : 0.3 }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function CallUI({ onEnd }) {
   const { state: agentState } = useVoiceAssistant();
   const connectionState = useConnectionState();
   const remoteParticipants = useRemoteParticipants();
   const { localParticipant } = useLocalParticipant();
   const transcriptions = useTranscriptions();
-
   const [callDuration, setCallDuration] = useState(0);
   const [waitSeconds, setWaitSeconds] = useState(0);
-  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const transcriptRef = useRef(null);
-  const timerRef = useRef(null);
-  const waitTimerRef = useRef(null);
 
   const isConnected = connectionState === ConnectionState.Connected;
   const agentJoined = remoteParticipants.length > 0;
+  const isSpeaking = agentState === "speaking";
+  const isListening = agentState === "listening";
+  const isThinking = agentState === "thinking";
 
-  // Count up while waiting for agent
   useEffect(() => {
     if (isConnected && !agentJoined) {
-      waitTimerRef.current = setInterval(
-        () => setWaitSeconds((s) => s + 1),
-        1000
-      );
-    } else {
-      if (waitTimerRef.current) clearInterval(waitTimerRef.current);
+      const t = setInterval(() => setWaitSeconds((s) => s + 1), 1000);
+      return () => clearInterval(t);
     }
-    return () => {
-      if (waitTimerRef.current) clearInterval(waitTimerRef.current);
-    };
   }, [isConnected, agentJoined]);
 
-  // Call duration timer — starts once agent has joined
   useEffect(() => {
     if (agentJoined) {
       const start = Date.now();
-      timerRef.current = setInterval(
-        () => setCallDuration(Math.floor((Date.now() - start) / 1000)),
-        1000
-      );
+      const t = setInterval(() => setCallDuration(Math.floor((Date.now() - start) / 1000)), 1000);
+      return () => clearInterval(t);
     }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
   }, [agentJoined]);
 
-  // Auto-scroll transcript
   useEffect(() => {
-    if (transcriptRef.current) {
-      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
-    }
+    if (transcriptRef.current) transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
   }, [transcriptions]);
 
-  // Show warm-up screen while room connected but agent not yet joined
-  if (isConnected && !agentJoined) {
-    return <WarmingUp waitSeconds={waitSeconds} />;
-  }
+  if (isConnected && !agentJoined) return <WarmingUp waitSeconds={waitSeconds} />;
 
-  const badgeState =
-    connectionState === ConnectionState.Connected ? "connected"
-    : connectionState === ConnectionState.Connecting ||
-      connectionState === ConnectionState.Reconnecting ? "connecting"
-    : connectionState === ConnectionState.Disconnected ? "disconnected"
-    : "idle";
-
-  const isSpeaking = agentState === "speaking";
-  const isListening = agentState === "listening";
-
-  const statusText =
-    agentState === "speaking" ? "Zara is speaking..."
-    : agentState === "thinking" ? "Processing..."
-    : agentState === "listening" ? "Listening..."
-    : "Ready";
+  const stateLabel = isSpeaking ? "Speaking" : isThinking ? "Thinking…" : isListening ? "Listening" : "Ready";
+  const stateColor = isSpeaking ? "text-violet-300" : isThinking ? "text-amber-300" : isListening ? "text-sky-300" : "text-slate-500";
+  const orbGlow = isSpeaking
+    ? "shadow-[0_0_60px_rgba(139,92,246,0.7),0_0_120px_rgba(139,92,246,0.3)]"
+    : isListening
+    ? "shadow-[0_0_40px_rgba(56,189,248,0.4)]"
+    : "shadow-[0_0_20px_rgba(139,92,246,0.2)]";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-start pt-8 px-4 pb-8">
+    <div className="min-h-screen bg-[#08080f] flex flex-col items-center justify-between py-8 px-4">
       <RoomAudioRenderer />
 
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Zara</h1>
-            <p className="text-slate-400 text-sm">AI by Faiz Shaikh</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <StatusBadge state={badgeState} />
-            <span className="text-slate-400 text-sm font-mono">
-              {formatDuration(callDuration)}
-            </span>
-          </div>
-        </div>
+      {/* Dot grid bg */}
+      <div className="fixed inset-0 pointer-events-none"
+        style={{ backgroundImage: "radial-gradient(circle, rgba(139,92,246,0.08) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
 
-        {/* Avatar */}
-        <div className="flex justify-center mb-8">
-          <div className="relative">
+      {/* Ambient blob */}
+      <motion.div
+        animate={{ opacity: isSpeaking ? 0.5 : 0.15 }}
+        transition={{ duration: 0.8 }}
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-violet-700/30 rounded-full blur-[120px] pointer-events-none"
+      />
+
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 w-full max-w-lg flex items-center justify-between"
+      >
+        <div>
+          <p className="text-white font-semibold">Zara</p>
+          <p className="text-slate-600 text-xs">AI by Faiz Shaikh</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+          <span className="text-slate-400 text-xs font-mono">{formatDuration(callDuration)}</span>
+        </div>
+      </motion.div>
+
+      {/* Orb area */}
+      <div className="relative z-10 flex flex-col items-center gap-6">
+        {/* Outer pulse rings */}
+        <div className="relative flex items-center justify-center">
+          <AnimatePresence>
             {isSpeaking && (
               <>
-                <div className="absolute inset-0 rounded-full border-2 border-violet-500/30 animate-ping scale-150" />
-                <div className="absolute inset-0 rounded-full border-2 border-blue-500/20 animate-ping scale-125" />
+                {[1.6, 1.35, 1.15].map((scale, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ scale: 1, opacity: 0.4 }}
+                    animate={{ scale: [1, scale], opacity: [0.4, 0] }}
+                    transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.4, ease: "easeOut" }}
+                    className="absolute w-28 h-28 rounded-full bg-violet-500/20"
+                  />
+                ))}
               </>
             )}
-            <div
-              className={`relative w-24 h-24 rounded-full bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center shadow-2xl transition-all duration-300 ${
-                isSpeaking ? "scale-110 shadow-violet-500/50" : "scale-100"
-              }`}
-            >
-              {isSpeaking ? (
-                <Volume2 className="w-10 h-10 text-white" />
-              ) : isListening ? (
-                <Mic className="w-10 h-10 text-white" />
-              ) : (
-                <MicOff className="w-10 h-10 text-white/60" />
-              )}
-            </div>
-          </div>
+          </AnimatePresence>
+
+          {/* Orb */}
+          <motion.div
+            animate={{ scale: isSpeaking ? 1.08 : 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            className={`relative w-28 h-28 rounded-full bg-gradient-to-br from-violet-600 via-violet-500 to-indigo-600 flex items-center justify-center transition-shadow duration-700 ${orbGlow}`}
+          >
+            <Mic className={`w-10 h-10 transition-all duration-300 ${isSpeaking ? "text-white scale-110" : isListening ? "text-sky-200" : "text-white/60"}`} />
+          </motion.div>
         </div>
 
-        <div className="text-center mb-6">
-          <span className="text-slate-400 text-sm">{statusText}</span>
+        {/* Wave + status */}
+        <div className="flex flex-col items-center gap-2">
+          <WaveBars active={isSpeaking} />
+          <motion.p
+            key={stateLabel}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className={`text-sm font-medium ${stateColor}`}
+          >
+            {stateLabel}
+          </motion.p>
         </div>
+      </div>
 
-        {/* Transcript */}
+      {/* Transcript */}
+      <div className="relative z-10 w-full max-w-lg flex flex-col gap-4">
         <div
           ref={transcriptRef}
-          className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 h-72 overflow-y-auto scrollbar-hide mb-6 space-y-3"
+          className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 h-52 overflow-y-auto scrollbar-hide space-y-2"
         >
           {transcriptions.length === 0 ? (
             <div className="h-full flex items-center justify-center">
-              <p className="text-slate-600 text-sm text-center">
-                Conversation will appear here...
-                <br />
-                Start speaking to Zara!
-              </p>
+              <p className="text-slate-700 text-xs text-center">Conversation will appear here…</p>
             </div>
           ) : (
             transcriptions.map((seg) => {
-              const isUser =
-                seg.participantInfo.identity === localParticipant?.identity;
+              const isUser = seg.participantInfo.identity === localParticipant?.identity;
               return (
-                <div
+                <motion.div
                   key={seg.streamInfo.id}
+                  initial={{ opacity: 0, x: isUser ? 16 : -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
                   className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                 >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                      isUser
-                        ? "bg-violet-600/80 text-white rounded-tr-sm"
-                        : "bg-slate-700/80 text-slate-100 rounded-tl-sm"
-                    }`}
-                  >
+                  <div className={`max-w-[80%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed ${
+                    isUser
+                      ? "bg-violet-600/70 text-white rounded-tr-sm"
+                      : "bg-white/[0.05] text-slate-200 rounded-tl-sm"
+                  }`}>
                     {seg.text}
                   </div>
-                </div>
+                </motion.div>
               );
             })
           )}
@@ -229,31 +232,38 @@ function CallUI({ onEnd }) {
 
         {/* End button */}
         <div className="flex justify-center">
-          {showEndConfirm ? (
-            <div className="flex items-center gap-3">
-              <span className="text-slate-400 text-sm">End conversation?</span>
-              <button
-                onClick={onEnd}
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-medium rounded-xl transition-colors"
+          <AnimatePresence mode="wait">
+            {confirmEnd ? (
+              <motion.div
+                key="confirm"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex items-center gap-2"
               >
-                Yes, end
-              </button>
-              <button
-                onClick={() => setShowEndConfirm(false)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-xl transition-colors"
+                <span className="text-slate-500 text-xs">End conversation?</span>
+                <button onClick={onEnd} className="px-3 py-1.5 bg-red-600/80 hover:bg-red-500 text-white text-xs font-medium rounded-lg transition-colors">
+                  End
+                </button>
+                <button onClick={() => setConfirmEnd(false)} className="px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 text-xs font-medium rounded-lg transition-colors">
+                  Cancel
+                </button>
+              </motion.div>
+            ) : (
+              <motion.button
+                key="end"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => setConfirmEnd(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.04] hover:bg-red-500/10 border border-white/[0.07] hover:border-red-500/40 text-slate-500 hover:text-red-400 text-sm font-medium rounded-xl transition-all duration-200"
               >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowEndConfirm(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-red-600/20 hover:bg-red-600/40 border border-red-500/50 text-red-400 hover:text-red-300 font-medium rounded-2xl transition-all duration-200"
-            >
-              <PhoneOff className="w-4 h-4" />
-              End Conversation
-            </button>
-          )}
+                <PhoneOff className="w-4 h-4" /> End call
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
@@ -262,14 +272,7 @@ function CallUI({ onEnd }) {
 
 export default function VoiceInterface({ token, serverUrl, onEnd }) {
   return (
-    <LiveKitRoom
-      token={token}
-      serverUrl={serverUrl}
-      connect={true}
-      audio={true}
-      video={false}
-      onDisconnected={onEnd}
-    >
+    <LiveKitRoom token={token} serverUrl={serverUrl} connect audio video={false} onDisconnected={onEnd}>
       <CallUI onEnd={onEnd} />
     </LiveKitRoom>
   );
