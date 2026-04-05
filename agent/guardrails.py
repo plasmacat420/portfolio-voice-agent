@@ -1,6 +1,9 @@
-# Only catch things that are clearly inappropriate for a portfolio assistant.
-# Keep this list tight — overly broad triggers break normal conversation.
 OFF_TOPIC_HARD_STOPS = [
+    # Clearly off-topic for a portfolio assistant
+    "politics",
+    "tell me a joke",
+    "personal life",
+    # Jailbreak attempts
     "ignore your instructions",
     "ignore previous instructions",
     "jailbreak",
@@ -14,13 +17,13 @@ OFF_TOPIC_HARD_STOPS = [
 
 
 def is_off_topic(text: str) -> bool:
-    """Return True only for clear jailbreak / manipulation attempts."""
+    """Return True for clear off-topic or jailbreak attempts."""
     text_lower = text.lower()
     return any(trigger in text_lower for trigger in OFF_TOPIC_HARD_STOPS)
 
 
 def get_redirect_response() -> str:
     return (
-        "I'm here to help you learn about Faiz and his work — "
-        "happy to answer any questions about that."
+        "I'm Zara — I'm here to help you learn about Faiz and his work. "
+        "What would you like to know?"
     )
