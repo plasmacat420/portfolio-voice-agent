@@ -3,17 +3,13 @@ import logging
 
 from livekit.agents import Agent, AgentSession, JobContext
 from livekit.agents import llm as agents_llm
-from livekit.plugins import cartesia, deepgram, openai
 
-from agent.config import settings
 from agent.emailer import send_summary_email
 from agent.guardrails import get_redirect_response, is_off_topic
 from agent.knowledge import get_system_prompt
 from agent.summarizer import summarize_conversation
 
 logger = logging.getLogger(__name__)
-
-GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 
 class Zara(Agent):
@@ -53,25 +49,11 @@ async def entrypoint(ctx: JobContext):
 
     transcript: list[dict] = []
 
+    # Use prewarmed instances from prewarm_fnc — zero cold-start delay
     session = AgentSession(
-        # Deepgram Nova-3 — streaming STT via WebSocket, no local VAD needed
-        # endpointing_ms=25 and no_delay=True are defaults (already fast)
-        stt=deepgram.STT(
-            api_key=settings.DEEPGRAM_API_KEY,
-            model="nova-3",
-            language="en-US",
-        ),
-        # Groq LLM via OpenAI-compatible base_url (free)
-        llm=openai.LLM(
-            model="llama-3.3-70b-versatile",
-            base_url=GROQ_BASE_URL,
-            api_key=settings.GROQ_API_KEY,
-        ),
-        tts=cartesia.TTS(
-            api_key=settings.CARTESIA_API_KEY,
-            model="sonic-turbo",  # lowest latency model (~50ms vs ~300ms for sonic-2)
-            voice="794f9389-aac1-45b6-b726-9d9369183238",  # "Barbra" — warm professional female
-        ),
+        stt=ctx.proc.userdata["stt"],
+        llm=ctx.proc.userdata["llm"],
+        tts=ctx.proc.userdata["tts"],
     )
 
     @session.on("user_input_transcribed")

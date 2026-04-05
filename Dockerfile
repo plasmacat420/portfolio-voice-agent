@@ -1,16 +1,19 @@
-FROM python:3.11-slim AS builder
-WORKDIR /app
-COPY pyproject.toml .
-RUN pip install --no-cache-dir hatchling && \
-    pip install --no-cache-dir -e "."
-
 FROM python:3.11-slim
+
 WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e "."
+
 COPY agent/ ./agent/
-COPY backend/ ./backend/
+
 RUN useradd -m appuser && chown -R appuser /app
 USER appuser
-EXPOSE 8000
-CMD ["uvicorn", "backend.server:app", "--host", "0.0.0.0", "--port", "8000"]
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "-m", "agent.main", "start"]

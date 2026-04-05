@@ -1,50 +1,18 @@
-import asyncio
 import logging
 import uuid
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from livekit.agents import WorkerOptions
-from livekit.agents.worker import AgentServer
+from livekit import api as lkapi
 from livekit.api import AccessToken, VideoGrants
 from pydantic import BaseModel
 
 from agent.config import settings
-from agent.zara import entrypoint
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-_agent_task: asyncio.Task | None = None
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global _agent_task
-
-    # Start the LiveKit agent worker in the background alongside FastAPI
-    worker_options = WorkerOptions(
-        entrypoint_fnc=entrypoint,
-        ws_url=settings.LIVEKIT_URL,
-        api_key=settings.LIVEKIT_API_KEY,
-        api_secret=settings.LIVEKIT_API_SECRET,
-    )
-    server = AgentServer.from_server_options(worker_options)
-    _agent_task = asyncio.create_task(server.run())
-    logger.info("LiveKit agent worker started alongside FastAPI")
-
-    yield
-
-    if _agent_task:
-        _agent_task.cancel()
-        try:
-            await _agent_task
-        except asyncio.CancelledError:
-            pass
-
-
-app = FastAPI(title="Portfolio Voice Agent API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Portfolio Voice Agent API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -77,7 +45,7 @@ async def health():
 
 @app.post("/api/token", response_model=TokenResponse)
 async def create_token(request: TokenRequest):
-    """Generate a LiveKit access token for a visitor."""
+    """Generate a LiveKit access token and dispatch the Zara agent to the room."""
     if not request.visitor_name or not request.visitor_name.strip():
         raise HTTPException(status_code=400, detail="visitor_name is required")
 
@@ -102,7 +70,25 @@ async def create_token(request: TokenRequest):
         .to_jwt()
     )
 
-    logger.info(f"Token created for visitor '{request.visitor_name}' in room '{room_name}'")
+    # Dispatch the Zara agent (running on LiveKit Cloud) to this room
+    lk = lkapi.LiveKitAPI(
+        url=settings.LIVEKIT_URL,
+        api_key=settings.LIVEKIT_API_KEY,
+        api_secret=settings.LIVEKIT_API_SECRET,
+    )
+    try:
+        await lk.agent_dispatch.create_dispatch(
+            lkapi.CreateAgentDispatchRequest(
+                room=room_name,
+                agent_name="zara",
+            )
+        )
+        logger.info(f"Agent dispatched to room '{room_name}' for visitor '{request.visitor_name}'")
+    except Exception as e:
+        logger.error(f"Agent dispatch failed for room '{room_name}': {e}")
+        raise HTTPException(status_code=502, detail="Failed to dispatch voice agent")
+    finally:
+        await lk.aclose()
 
     return TokenResponse(
         token=token,
